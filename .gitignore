@@ -1,0 +1,16 @@
+# veri
+data/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ide/sistem
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,14 @@
+# Adim 1: fiyat verisi ingestion yapilandirmasi
+universe:
+  - AAPL
+  - MSFT
+  - NVDA
+  - ^GSPC   # S&P 500 endeksi
+
+start_date: "2015-01-01"
+
+storage:
+  prices_path: data/raw/prices.parquet
+
+ingestion:
+  batch_size: 10
