@@ -75,11 +75,10 @@ def test_psi_table_bos():
 
 
 def test_mlflow_runs_table_gercek_db():
-    """mlflow.db varsa 4 run beklenir (3 variant + production); yoksa atla."""
-    db = PROJECT_ROOT / "mlflow.db"
-    if not db.is_file():
-        pytest.skip("mlflow.db yok (CI ortami), gercek DB testi atlandi")
+    """Gercek DB'de run varsa 4 run beklenir (3 variant + production); yoksa atla."""
     table = mlflow_runs_table(experiment="finans-training")
+    if table.empty:
+        pytest.skip("MLflow'da finans-training run'lari yok (CI ortami), atlandi")
     assert len(table) == 4
     assert "production-gru" in set(table["run"])
     # production run'in holdout metrigi dolu olmali
