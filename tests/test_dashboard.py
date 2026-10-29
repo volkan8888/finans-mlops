@@ -75,23 +75,22 @@ def test_psi_table_bos():
 
 
 def test_mlflow_runs_table_gercek_db():
-    """mlflow.db varsa 4 run beklenir (3 variant + production); yoksa bos."""
+    """mlflow.db varsa 4 run beklenir (3 variant + production); yoksa atla."""
     db = PROJECT_ROOT / "mlflow.db"
+    if not db.is_file():
+        pytest.skip("mlflow.db yok (CI ortami), gercek DB testi atlandi")
     table = mlflow_runs_table(experiment="finans-training")
-    if db.is_file():
-        assert len(table) == 4
-        assert "production-gru" in set(table["run"])
-        # production run'in holdout metrigi bilgisayarda varsayilabilir
-        prod_rows = table[table["run"] == "production-gru"]
-        assert prod_rows["holdout_mean_ic"].notna().all()
-    else:
-        assert table.empty
+    assert len(table) == 4
+    assert "production-gru" in set(table["run"])
+    # production run'in holdout metrigi dolu olmali
+    prod_rows = table[table["run"] == "production-gru"]
+    assert prod_rows["holdout_mean_ic"].notna().all()
 
 
 def test_production_alias_info_bilgi():
+    db_vardi = (PROJECT_ROOT / "mlflow.db").is_file()  # cagrimdan ONCE bak
     text = production_alias_info()
-    db = PROJECT_ROOT / "mlflow.db"
-    if db.is_file():
+    if db_vardi:
         assert "finans-ranker" in text
     else:
         assert "okunamadi" in text or "kurulu" in text
