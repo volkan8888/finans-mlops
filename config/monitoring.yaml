@@ -1,0 +1,11 @@
+# Adim 7 (FAZ 5): monitoring yapilandirmasi
+# Yollar proje kokune cozulur (diger config'lerle ayni konvansiyon).
+
+features_path: data/processed/features.parquet        # dagilim kaynak verisi
+predictions_path: data/processed/holdout_predictions.parquet  # skor akisi
+roll_ic_window: 20        # kayan IC penceresi (gun)
+psi_bins: 10              # PSI tarifeli kutu sayisi
+psi_alert: 0.2            # PSI uyari esigi: 0.2 ve ustu = uyari (standart esik)
+alert_ic: 0.0             # kayan IC bu degerin altina inerse uyari
+nw_lag: 4                 # Newey-West lag: label_horizon(5) - 1 (IC otokorelasyonu)
+report_path: reports/monitoring_report.json

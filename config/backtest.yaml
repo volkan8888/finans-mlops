@@ -1,0 +1,15 @@
+# Adim 4 (FAZ 2): backtest yapilandirmasi
+# Yollar proje kokune cozulur (ingestion konvansiyonu).
+
+long_quantile: 0.2      # ust %20 -> long
+short_quantile: 0.2     # alt %20 -> short (yalnizca long_short modu)
+rebalance_every: 5      # islem gunu; her kinci gunde pozisyonlar yenilenir
+cost_bps: 10            # TEK YON maliyet (her buy ve her sell icin 10 bp)
+weighting: equal        # esit agirlik
+modes: [long_short, long_only]   # ikisi de raporlanir
+benchmark: SPY          # data/raw prices icindeki sembol
+
+paths:
+  predictions_path: data/processed/holdout_predictions.parquet
+  prices_path: data/raw/prices.parquet
+  reports_dir: reports

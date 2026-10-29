@@ -110,7 +110,7 @@ def fetch_symbol(ticker: str, start: str, end: str | None = None) -> pd.DataFram
             progress=False,
             threads=False,
         )
-    except Exception as exc:  # ag/kaynak hatalari pipeline'i uzun dusurmez
+    except Exception as exc:  # noqa: BLE001 - ag/kaynak hatalari akisi oldurmuyor
         logger.error("Indirme hatasi %s (start=%s): %s", ticker, start, exc)
         return pd.DataFrame(columns=PRICE_COLUMNS)
 
@@ -156,8 +156,8 @@ def download_in_batches(
                 group_by="column",
                 threads=True,
             )
-        except Exception as exc:
-            logger.error("Blok indirme hatasi %s: %s — tek tek deneniyor", chunk, exc)
+        except Exception as exc:  # noqa: BLE001 - blok hatasi tek-tekleme yedegine duser
+            logger.error("Blok indirme hatasi %s: %s - tek tek deneniyor", chunk, exc)
             raw = None
 
         if raw is not None and not raw.empty:

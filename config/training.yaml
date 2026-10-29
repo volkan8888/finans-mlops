@@ -1,0 +1,51 @@
+# Adim 3 (FAZ 1): egitim yapilandirmasi
+# Yollar proje kokune gore cozulur (ingestion konvansiyonu).
+
+seed: 42
+device: auto          # auto | cpu | cuda
+
+# bolme / sizinti-onleme
+holdout_years: 2      # son N takvim yili HOLDOUT; tuning'de KULLANILMAZ
+purge_days: 5         # label_horizon ile ayni; fold sonu labe'in val'e tasmasini engeller
+embargo_days: 5       # purge sonrasi ekstra bos islem gunu
+wf_min_train_years: 3 # ilk fold'da minimum egitim yili
+wf_val_months: 6      # her fold'un validation penceresi (ay)
+wf_step_months: 6     # fold'larin kaydirilma adimi (ay)
+
+# model girdisi
+seq_len: 20           # LSTM/GRU icin gecmis feature penceresi
+
+# egitim varsayilanlari (model bazindan override edilebilir)
+# NOT: kosu butcesi icin epoch'lar kucuk tutuldu; girdi kucuk olsa da
+# walk-forward'da 13 fold * 3 model oldugundan toplam yapilacak is onemli.
+defaults:
+  lr: 0.001
+  weight_decay: 0.0001
+  batch_size: 512
+  epochs: 20
+  patience: 3
+  grad_clip: 1.0
+
+loss: mse             # mse | listnet (gunluk pairwise softmax CE)
+
+models:
+  - name: ridge
+    params: {alpha: 10.0}
+  - name: mlp
+    params: {hidden: [64, 32], dropout: 0.1}
+  - name: gru
+    params: {hidden: 32, layers: 1, dropout: 0.1, epochs: 10, patience: 2}
+
+label_horizon: 5      # features.yaml ile ayni; purge = bunun kadar islem gunu
+
+paths:
+  features_path: data/processed/features.parquet
+  models_dir: models
+  holdout_predictions_path: data/processed/holdout_predictions.parquet
+
+mlflow:
+  enabled: true
+  tracking_uri: "sqlite:///mlflow.db"
+  experiment: finans-training
+  registry_name: finans-ranker
+  artifact_dir: mlruns

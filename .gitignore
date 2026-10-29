@@ -8,9 +8,30 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+*.egg-info/
 
 # ide/sistem
 .idea/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# mlflow / deney takibi
+mlruns/
+mlflow.db
+
+# uretim artifaktlari (meta.json kalir, agir dosyalar gitmez)
+models/*/model.pt
+models/*/model.joblib
+
+# raporlar: sadece kucuk ozetler takip edilir; agir seriler (equity
+# curve, gunluk tahmin parquet) haric
+reports/*
+!reports/backtest_summary.json
+!reports/monitoring_report.json
+!reports/ic_stats_report.json
+!reports/forward_test/
+reports/forward_test/*
+!reports/forward_test/freeze.json
+!reports/forward_test/criteria.md
+reports/equity_curve.csv

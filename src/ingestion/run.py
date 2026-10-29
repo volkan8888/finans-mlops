@@ -1,19 +1,18 @@
 """Ingestion boru hattini calistiran giris noktasi.
 
 Akis:
-    1. config ve universe yukle
+    1. config, universe (universe.txt) ve benchmarks yukle
     2. depodaki son tarihe bak, indirme penceresini belirle
        (en eski son tarih + 1 gun; hic veri yoksa config start_date)
-    3. download_in_batches ile indir
+    3. universe ve benchmarks'i ayri bloklarda indir; IKISI DE depoya yazilir,
+       feature/siralama evrenine yalnizca universe girer
     4. validate_prices ile dogrula (bozuksa HICBIR SEY kaydetmeden dur)
-    5. merge_prices + save_prices (merge idempotent; ayni (date,ticker) birden
-       iki kez eklenmez)
+    5. merge_prices + save_prices (merge idempotent)
     6. find_anomalies raporunu logla
-    Ozet log: ticker sayisi, yeni satir sayisi, anomali sayisi.
+    Ozet log: stok/benchmark sayisi, yeni satir sayisi, anomali sayisi.
 
-Idempotentlik: arka arkaya iki kez calistirildiginda ikinci koşuda
-yeni satir eklenmez (merge cakismada yeni veriyi tutar ama tip olarak
-ayni gundar gelirse satir sayisi degismez).
+Idempotentlik: ust uste kosulan ikinci gerceklemede yeni satir eklenmez;
+veri birebir ayniysa dosya fiziksel olarak da yeniden yazilmaz.
 """
 
 from __future__ import annotations
@@ -28,16 +27,16 @@ import pandas as pd
 if __package__ in (None, ""):  # dogrudan calistirma: python src/ingestion/run.py
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ingestion.config import DEFAULT_CONFIG_PATH, load_config, load_universe  # noqa: E402
-from ingestion.download import download_in_batches  # noqa: E402
-from ingestion.storage import (  # noqa: E402
+from ingestion.config import DEFAULT_CONFIG_PATH, load_config
+from ingestion.download import download_in_batches
+from ingestion.storage import (
     empty_prices_frame,
     get_last_date,
     load_prices,
     merge_prices,
     save_prices,
 )
-from ingestion.validation import find_anomalies, validate_prices  # noqa: E402
+from ingestion.validation import find_anomalies, validate_prices
 
 logger = logging.getLogger(__name__)
 
@@ -53,43 +52,73 @@ def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
     started = time.perf_counter()
 
     cfg = load_config(config_path)
-    universe = load_universe(cfg.universe)
-    logger.info("Ingestion basliyor: %d ticker | config=%s", len(universe), config_path)
+    universe = cfg.universe      # feature/siralama evreni (stoklar)
+    benchmarks = cfg.benchmarks  # depoya yazilan, evrene girmeyen referanslar
+    symbols_all = universe + benchmarks
+
+    logger.info(
+        "Ingestion basliyor: %d stok + %d benchmark | config=%s",
+        len(universe), len(benchmarks), config_path,
+    )
 
     existing = load_prices(cfg.prices_path)
-    last_dates = {ticker: get_last_date(existing, ticker) for ticker in universe}
-    stored = [ts for ts in last_dates.values() if ts is not None]
+    last_dates = {ticker: get_last_date(existing, ticker) for ticker in symbols_all}
+    stored_dates = [ts for ts in last_dates.values() if ts is not None]
+    never_stored = [t for t, d in last_dates.items() if d is None]
+    stored_tickers = [t for t, d in last_dates.items() if d is not None]
+    today = pd.Timestamp.now().normalize()
 
-    if stored:
-        anchor = min(stored)
-        today = pd.Timestamp.now().normalize()
+    def _dl(label: str, tickers: list[str], start: str, window_end: str | None) -> pd.DataFrame:
+        """Grup halinde indirir; bos grup icin bos frame doner."""
+        if not tickers:
+            return empty_prices_frame()
         logger.info(
-            "Depodaki son tarihler: %s",
-            {t: str(d.date()) for t, d in last_dates.items() if d is not None},
+            "Indirme [%s]: %d sembol | %s .. %s",
+            label, len(tickers), start, window_end or "bugun",
+        )
+        return download_in_batches(
+            tickers, start=start, end=window_end, batch_size=cfg.batch_size
+        )
+
+    parts: list[pd.DataFrame] = []
+
+    # 1) depoda hic veri olmayan semboller (yeni evren vs.): start_date'ten TAM tarihli
+    if never_stored:
+        logger.info(
+            "Yeni semboller (%d): start_date'ten tam tarihli cekilecek: %s",
+            len(never_stored),
+            cfg.start_date,
+        )
+        parts.append(_dl("tam-tarih/yeni", never_stored, cfg.start_date, end))
+
+    # 2) kayitli semboller: artimci pencere (son tarih + 1) veya ayni-gun tazeleme
+    if stored_dates:
+        anchor = min(stored_dates)
+        logger.info(
+            "Depo son tarihleri: min=%s max=%s (kayitli %d/%d symbol)",
+            anchor.date(),
+            max(stored_dates).date(),
+            len(stored_dates),
+            len(symbols_all),
         )
         if anchor > today:
-            logger.info("Depo bugundan ileri tarihte; indirme atlandi.")
-            raw = empty_prices_frame()
-        elif anchor >= today:
-            # bugunun satirlari yeniden cekilir; gun ici parcal bar'lar, EOD
-            # degerleriyle degistiyse merge keep=last ile guncellenir.
-            start = anchor.strftime("%Y-%m-%d")
-            logger.info("Ayni-gun tazeleme penceresi: %s ..", start)
-            raw = download_in_batches(
-                universe, start=start, end=end, batch_size=cfg.batch_size
-            )
+            logger.info("Depo bugundan ileri tarihte; artimli indirme atlandi.")
         else:
-            start = _next_day(anchor)
-            logger.info("Indirme penceresi: %s .. %s", start, end or "bugun")
-            raw = download_in_batches(
-                universe, start=start, end=end, batch_size=cfg.batch_size
-            )
+            if anchor >= today:
+                # bugunun satirlari tazelenir; degismisler merge keep=last ile guncellenir
+                start = anchor.strftime("%Y-%m-%d")
+                logger.info("Ayni-gun tazeleme penceresi: %s ..", start)
+            else:
+                start = _next_day(anchor)
+                logger.info("Artimci indirme penceresi: %s .. %s", start, end or "bugun")
+            parts.append(_dl("artimci", stored_tickers, start, end))
+
+    if not parts:
+        raw = empty_prices_frame()
+    elif len(parts) == 1:
+        raw = parts[0]
     else:
-        start = cfg.start_date
-        logger.info("Depo bos; config start_date kullaniliyor: %s ..", start)
-        raw = download_in_batches(
-            universe, start=start, end=end, batch_size=cfg.batch_size
-        )
+        raw = pd.concat(parts, ignore_index=True)
 
     if raw.empty:
         logger.info("Indirme bos dondu (yeni gun yok / kaynak yok); depo degismedi.")
@@ -119,12 +148,12 @@ def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
     else:
         logger.info("Anomali raporu: temiz, 0 supheli gun.")
 
-    # kaynakta hic veri gelmeyen ticker'lerde imza (kesif etiket)
+    # hic veri gelmeyen semboller (kesif uyarisi)
     if not validated.empty:
         returned = set(validated["ticker"])
         missing = [
             ticker
-            for ticker in universe
+            for ticker in symbols_all
             if ticker not in returned and get_last_date(existing, ticker) is None
         ]
         if missing:
@@ -132,8 +161,9 @@ def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
 
     elapsed = time.perf_counter() - started
     logger.info(
-        "OZET: %d ticker | %d yeni satir | %d anomali | %.1f sn",
+        "OZET: %d stok | %d benchmark | %d yeni satir | %d anomali | %.1f sn",
         len(universe),
+        len(benchmarks),
         new_rows,
         len(anomalies),
         elapsed,

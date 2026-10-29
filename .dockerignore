@@ -1,0 +1,23 @@
+# Adim 10 (FAZ 8): imaja ve baglama isine girmeyecekler
+# Veri/artifakt dosyalari mount edilir; imaja gecmez buyuk mertebedir.
+
+.git
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+mlruns/
+mlflow.db
+data/
+reports/
+models/
+
+docs/
+Dockerfile
+docker-compose.yml
+.approvals/
+.env

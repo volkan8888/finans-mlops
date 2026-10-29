@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-10-29 23:56:03.745745",
+  "label_horizon": 5,
+  "nw_lag": 4,
+  "stride": 5,
+  "holdout": {
+    "n_days": 501,
+    "mean_ic": 0.008236381359901759,
+    "std_ic": 0.23581706402090766,
+    "icir": 0.034926994762226014,
+    "t_raw": 0.7817719466208815,
+    "t_nw": 0.4507380221010981,
+    "positive_share": 0.530938123752495,
+    "stride_n": 101,
+    "stride_mean_ic": 0.005725688847954567,
+    "stride_t_stat": 0.25593403551950683
+  },
+  "stored_holdout_raw": {},
+  "walk_forward_val": {
+    "note": "walk-forward val tahminleri diske kaydedilmemisti; NW/bagimsiz t sonradan hesaplanamaz (yalnizca egitim kaydindaki ham t mevcut)"
+  },
+  "rows": [
+    {
+      "seri": "holdout (gru) - yeniden hesap",
+      "n_gun": 501,
+      "mean_ic": 0.008236381359901759,
+      "t_ham": 0.7817719466208815,
+      "t_nw (lag=4)": 0.4507380221010981,
+      "n_bagimsiz": 101,
+      "mean_ic (bagimsiz)": 0.005725688847954567,
+      "t_bagimsiz": 0.25593403551950683
+    }
+  ]
+}

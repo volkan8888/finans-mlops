@@ -1,0 +1,84 @@
+{
+  "reference_end": "2024-10-14",
+  "current_window": [
+    "2024-10-15",
+    "2026-10-14"
+  ],
+  "psi_alert_threshold": 0.2,
+  "feature_drift": [
+    {
+      "feature": "momentum_5",
+      "psi": 0.0014,
+      "ks_stat": 0.0115,
+      "ks_p": 0.016535,
+      "alert": false
+    },
+    {
+      "feature": "momentum_20",
+      "psi": 0.0051,
+      "ks_stat": 0.0206,
+      "ks_p": 0.0,
+      "alert": false
+    },
+    {
+      "feature": "momentum_60",
+      "psi": 0.0083,
+      "ks_stat": 0.0275,
+      "ks_p": 0.0,
+      "alert": false
+    },
+    {
+      "feature": "momentum_skip_60_5",
+      "psi": 0.0072,
+      "ks_stat": 0.0239,
+      "ks_p": 0.0,
+      "alert": false
+    },
+    {
+      "feature": "volatility_20",
+      "psi": 0.0156,
+      "ks_stat": 0.0277,
+      "ks_p": 0.0,
+      "alert": false
+    },
+    {
+      "feature": "rsi_14",
+      "psi": 0.0069,
+      "ks_stat": 0.0212,
+      "ks_p": 0.0,
+      "alert": false
+    },
+    {
+      "feature": "volume_change_20",
+      "psi": 0.0001,
+      "ks_stat": 0.0043,
+      "ks_p": 0.882832,
+      "alert": false
+    },
+    {
+      "feature": "reversal_5",
+      "psi": 0.0014,
+      "ks_stat": 0.0107,
+      "ks_p": 0.030881,
+      "alert": false
+    }
+  ],
+  "performance": {
+    "overall": {
+      "mean_ic": 0.0082,
+      "std_ic": 0.2358,
+      "icir": 0.0349,
+      "t_stat": 0.7818,
+      "t_nw": 0.4507,
+      "positive_share": 0.5309,
+      "n_days": 501.0
+    },
+    "rolling_ic_20d": 0.118,
+    "alert": false,
+    "coverage_n_days_covered": 501,
+    "coverage_avg_tickers_per_day": 44.0,
+    "coverage_first_date": "2024-10-15",
+    "coverage_last_date": "2026-10-14"
+  },
+  "alerts": []
+}

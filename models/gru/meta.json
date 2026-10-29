@@ -1,0 +1,206 @@
+{
+  "model_name": "gru",
+  "feature_cols": [
+    "momentum_5",
+    "momentum_20",
+    "momentum_60",
+    "momentum_skip_60_5",
+    "volatility_20",
+    "rsi_14",
+    "volume_change_20",
+    "reversal_5"
+  ],
+  "seed": 42,
+  "device": "cpu",
+  "loss": "mse",
+  "label_horizon": 5,
+  "purge_days": 5,
+  "embargo_days": 5,
+  "seq_len": 20,
+  "model_params": {
+    "hidden": 32,
+    "layers": 1,
+    "dropout": 0.1,
+    "epochs": 10,
+    "patience": 2
+  },
+  "train_dates": [
+    "2015-03-31",
+    "2024-03-14"
+  ],
+  "early_stop_val": [
+    "2024-04-01",
+    "2024-09-27"
+  ],
+  "holdout_range": [
+    "2024-10-15",
+    "2026-10-14"
+  ],
+  "final_val_ic": -0.049416647091065705,
+  "holdout_ic": {
+    "mean_ic": 0.008236381359901759,
+    "std_ic": 0.23581706402090766,
+    "icir": 0.034926994762226014,
+    "t_stat": 0.7817719466208815,
+    "positive_share": 0.530938123752495,
+    "n_days": 501
+  },
+  "fold_reports": [
+    {
+      "fold": 1,
+      "train_start": "2015-03-31",
+      "train_end": "2018-03-15",
+      "val_start": "2018-04-02",
+      "val_end": "2018-09-28",
+      "val_days": 127,
+      "val_mean_ic": 0.044556164094710145,
+      "val_icir": 0.1462071121944361
+    },
+    {
+      "fold": 2,
+      "train_start": "2015-03-31",
+      "train_end": "2018-09-14",
+      "val_start": "2018-10-01",
+      "val_end": "2019-03-29",
+      "val_days": 124,
+      "val_mean_ic": 0.009611493782536543,
+      "val_icir": 0.030545595371824465
+    },
+    {
+      "fold": 3,
+      "train_start": "2015-03-31",
+      "train_end": "2019-03-15",
+      "val_start": "2019-04-01",
+      "val_end": "2019-09-27",
+      "val_days": 126,
+      "val_mean_ic": 0.007006817095194638,
+      "val_icir": 0.028497876862055748
+    },
+    {
+      "fold": 4,
+      "train_start": "2015-03-31",
+      "train_end": "2019-09-13",
+      "val_start": "2019-09-30",
+      "val_end": "2020-03-27",
+      "val_days": 125,
+      "val_mean_ic": -0.0016135306553911213,
+      "val_icir": -0.005834464885876484
+    },
+    {
+      "fold": 5,
+      "train_start": "2015-03-31",
+      "train_end": "2020-03-13",
+      "val_start": "2020-03-30",
+      "val_end": "2020-09-29",
+      "val_days": 128,
+      "val_mean_ic": 0.024438424947145876,
+      "val_icir": 0.0822531594857462
+    },
+    {
+      "fold": 6,
+      "train_start": "2015-03-31",
+      "train_end": "2020-09-15",
+      "val_start": "2020-09-30",
+      "val_end": "2021-03-29",
+      "val_days": 124,
+      "val_mean_ic": 0.0701198026779422,
+      "val_icir": 0.27202146136190214
+    },
+    {
+      "fold": 7,
+      "train_start": "2015-03-31",
+      "train_end": "2021-03-15",
+      "val_start": "2021-03-30",
+      "val_end": "2021-09-29",
+      "val_days": 128,
+      "val_mean_ic": 0.03787548449612403,
+      "val_icir": 0.17086816617507727
+    },
+    {
+      "fold": 8,
+      "train_start": "2015-03-31",
+      "train_end": "2021-09-15",
+      "val_start": "2021-09-30",
+      "val_end": "2022-03-29",
+      "val_days": 125,
+      "val_mean_ic": -0.0031616631430584873,
+      "val_icir": -0.014466850755452993
+    },
+    {
+      "fold": 9,
+      "train_start": "2015-03-31",
+      "train_end": "2022-03-15",
+      "val_start": "2022-03-30",
+      "val_end": "2022-09-29",
+      "val_days": 127,
+      "val_mean_ic": -0.022960607725302833,
+      "val_icir": -0.09079349280529474
+    },
+    {
+      "fold": 10,
+      "train_start": "2015-03-31",
+      "train_end": "2022-09-15",
+      "val_start": "2022-09-30",
+      "val_end": "2023-03-29",
+      "val_days": 124,
+      "val_mean_ic": 0.037380936143126695,
+      "val_icir": 0.18409205399769635
+    },
+    {
+      "fold": 11,
+      "train_start": "2015-03-31",
+      "train_end": "2023-03-15",
+      "val_start": "2023-03-30",
+      "val_end": "2023-09-29",
+      "val_days": 127,
+      "val_mean_ic": 0.023077136499586606,
+      "val_icir": 0.10904567559346366
+    },
+    {
+      "fold": 12,
+      "train_start": "2015-03-31",
+      "train_end": "2023-09-15",
+      "val_start": "2023-10-02",
+      "val_end": "2024-03-28",
+      "val_days": 124,
+      "val_mean_ic": 0.05119689013162381,
+      "val_icir": 0.1991610696296598
+    },
+    {
+      "fold": 13,
+      "train_start": "2015-03-31",
+      "train_end": "2024-03-14",
+      "val_start": "2024-04-01",
+      "val_end": "2024-09-27",
+      "val_days": 126,
+      "val_mean_ic": -0.049416647091065705,
+      "val_icir": -0.20382901427721348
+    }
+  ],
+  "model_comparison": {
+    "ridge": {
+      "mean_ic": 0.010455130661990998,
+      "std_ic": 0.26896722585153865,
+      "icir": 0.03887139270924368,
+      "t_stat": 1.571769943356997,
+      "positive_share": 0.5211009174311927,
+      "n_days": 1635
+    },
+    "mlp": {
+      "mean_ic": 0.0139790984693976,
+      "std_ic": 0.20576178957623364,
+      "icir": 0.06793826248395074,
+      "t_stat": 2.747092695517925,
+      "positive_share": 0.5259938837920489,
+      "n_days": 1635
+    },
+    "gru": {
+      "mean_ic": 0.017479758910081498,
+      "std_ic": 0.25744356121600537,
+      "icir": 0.06789744061773324,
+      "t_stat": 2.745442057918384,
+      "positive_share": 0.5284403669724771,
+      "n_days": 1635
+    }
+  }
+}

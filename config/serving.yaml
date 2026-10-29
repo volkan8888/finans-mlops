@@ -1,0 +1,10 @@
+# Adim 6 (FAZ 4) + canli skor guncellemesi: serving yapilandirmasi
+# Yollar proje kokune cozulur (diger config'lerle ayni konvansiyon).
+
+source: prices                                   # prices | features_parquet
+prices_path: data/raw/prices.parquet             # canli feature hammadde (ingestion cikisi)
+features_config: config/features.yaml            # egitimle BIREBIR ayni feature tanimi
+features_path: data/processed/features.parquet   # yedek kaynak (fiyat yoksa; bayat, en az 5 is gunu geride)
+host: 127.0.0.1
+port: 8000
+reload: false

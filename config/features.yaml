@@ -1,0 +1,22 @@
+# Adim 2 (asama 1): feature pipeline yapilandirmasi
+# Yollar proje kokune gore cozulur (ingestion konvansiyonu).
+
+momentum_windows: [5, 20, 60]
+momentum_skip:
+  window: 60
+  skip: 5
+volatility_window: 20
+rsi_window: 14
+volume_window: 20
+reversal_window: 5
+label_horizon: 5
+winsorize:
+  lower: 0.01
+  upper: 0.99
+min_tickers_per_date: 10
+
+paths:
+  prices_path: data/raw/prices.parquet
+  output_path: data/processed/features.parquet
+
+# benchmarks burada tanimli degilse config/data.yaml'daki benchmarks kullanilir.

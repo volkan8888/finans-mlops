@@ -7,7 +7,6 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from ingestion.config import load_config, load_universe
-from ingestion.validation import find_anomalies, validate_prices
 from ingestion.storage import (
     PRICE_COLUMNS,
     get_last_date,
@@ -15,7 +14,7 @@ from ingestion.storage import (
     merge_prices,
     save_prices,
 )
-
+from ingestion.validation import find_anomalies, validate_prices
 
 # ---------------------------------------------------------------------------
 # config / load_universe
@@ -164,6 +163,60 @@ def test_get_last_date():
     assert get_last_date(df, "YOK") is None
     assert get_last_date(None, "AAPL") is None
     assert get_last_date(pd.DataFrame(), "AAPL") is None
+
+
+# ---------------------------------------------------------------------------
+# config: universe.txt + benchmarks (adim 2)
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_universe_txt_ve_benchmarks(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "universe.txt").write_text(
+        "# sektor yorumlari\n"
+        "  AAPL \n"
+        "msft\n"
+        "\n"
+        "JPM   # satir ici yorum\n",
+        encoding="utf-8",
+    )
+    (config_dir / "data.yaml").write_text(
+        "universe_path: config/universe.txt\n"
+        "benchmarks:\n"
+        "  - ^gspc\n"
+        "  - SPY\n"
+        "start_date: '2020-01-02'\n"
+        "storage:\n"
+        "  prices_path: data/raw/prices.parquet\n"
+        "ingestion:\n"
+        "  batch_size: 5\n",
+        encoding="utf-8",
+    )
+
+    cfg = load_config(config_dir / "data.yaml")
+
+    assert cfg.universe == ["AAPL", "MSFT", "JPM"]
+    assert cfg.benchmarks == ["^GSPC", "SPY"]
+    # benchmark feature evrene girmemeli
+    assert "SPY" not in cfg.universe
+
+
+def test_load_config_evren_benchmark_cakismasi_evrenden_duser(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "universe.txt").write_text("AAPL\n SPY \nJPM\n", encoding="utf-8")
+    (config_dir / "data.yaml").write_text(
+        "universe_path: config/universe.txt\n"
+        "benchmarks:\n"
+        "  - SPY\n",
+        encoding="utf-8",
+    )
+
+    cfg = load_config(config_dir / "data.yaml")
+
+    assert cfg.universe == ["AAPL", "JPM"]
+    assert cfg.benchmarks == ["SPY"]
 
 
 # ---------------------------------------------------------------------------

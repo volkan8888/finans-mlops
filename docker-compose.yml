@@ -1,0 +1,36 @@
+# Adim 10 (FAZ 8): iki servis - skor API + MLflow UI (ayni mlflow.db'i paylasir)
+# Calistirma: docker compose up
+# Not: mlflow.db ve mlruns host'tan mount edilir (kalici kayit).
+
+services:
+  api:
+    build: .
+    image: finans-mlops:latest
+    container_name: finans-api
+    command: ["python", "-m", "serving.app"]
+    environment:
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro          # feature kaynagi (sadece okuma)
+      - ./models:/app/models:ro      # yerel fallback model dosyalari
+      - ./mlflow.db:/app/mlflow.db   # MLflow backend (oku)
+      - ./mlruns:/app/mlruns:ro      # artifakt klasoru
+      - ./reports:/app/reports:ro    # raporlar
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mlflow-ui:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: finans-mlflow-ui
+    command: ["server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "sqlite:////app/mlflow.db"]
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow.db:/app/mlflow.db
+      - ./mlruns:/app/mlruns
+    profiles: ["ui"]  # varsayilan 'docker compose up api' ile UI acilmaz; --profile ui ile acilir

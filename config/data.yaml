@@ -1,9 +1,12 @@
-# Adim 1: fiyat verisi ingestion yapilandirmasi
-universe:
-  - AAPL
-  - MSFT
-  - NVDA
+# Adim 1-2: ingestion yapilandirmasi
+# Stok evreni universe.txt'ten okunur (universe_path, proje kokune gore).
+# Benchmark'lar depoya YAZILIR ama feature/siralama evrenine GIRMEZ.
+
+universe_path: config/universe.txt
+
+benchmarks:
   - ^GSPC   # S&P 500 endeksi
+  - SPY     # S&P 500 ETF
 
 start_date: "2015-01-01"
 

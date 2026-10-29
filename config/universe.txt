@@ -1,0 +1,65 @@
+# finans-mlops stok evreni (adim 2)
+# Her satira bir ticker. '#' ile baslayan satirlar ve satir ici '#' yorumlari yok sayilir.
+# Benchmark'lar (^GSPC, SPY) BURADA YOK — onlar config/data.yaml'da tanimli.
+
+# Teknoloji / Yari iletken
+AAPL
+MSFT
+NVDA
+AVGO
+AMD
+INTC
+CRM
+ORCL
+ADBE
+CSCO
+
+# Iletisim / Medya
+GOOGL
+META
+NFLX
+DIS
+
+# Tuketici dayanikli
+AMZN
+TSLA
+HD
+MCD
+NKE
+
+# Tuketici temel
+WMT
+COST
+KO
+PEP
+PG
+
+# Saglik
+UNH
+JNJ
+LLY
+PFE
+ABBV
+MRK
+
+# Bankacilik / Odeme
+JPM
+BAC
+WFC
+GS
+V
+MA
+
+# Enerji
+XOM
+CVX
+
+# Sanayi
+CAT
+BA
+DE
+UNP
+
+# Kullanicili servis / REIT
+NEE
+AMT

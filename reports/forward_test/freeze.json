@@ -1,0 +1,56 @@
+{
+  "frozen_at": "2026-10-30 00:17:38.021550",
+  "python": "3.12.10",
+  "model": {
+    "name": "gru",
+    "source_kind": "mlflow_registry",
+    "registry_version": "1",
+    "base_dir": "C:\\Users\\VOLKAN\\Desktop\\finans-mlops\\mlruns\\1\\f293510781ec4b518928faa0b32c9435\\artifacts\\model",
+    "sha256": {
+      "model_files": {
+        "model.pt": "50241b342bf7a9cc1b67366811a1f7b2a036a75275796e93cd28358271f17350"
+      },
+      "meta.json": "b5dd498a4e5bc6828fc5643284b13e1fde9dbd8cdb62d5c4004a70b7b20fa596"
+    }
+  },
+  "meta_summary": {
+    "feature_cols": [
+      "momentum_5",
+      "momentum_20",
+      "momentum_60",
+      "momentum_skip_60_5",
+      "volatility_20",
+      "rsi_14",
+      "volume_change_20",
+      "reversal_5"
+    ],
+    "seed": 42,
+    "label_horizon": 5,
+    "seq_len": 20,
+    "model_params": {
+      "hidden": 32,
+      "layers": 1,
+      "dropout": 0.1,
+      "epochs": 10,
+      "patience": 2
+    },
+    "train_dates": [
+      "2015-03-31",
+      "2024-03-14"
+    ],
+    "holdout_range": [
+      "2024-10-15",
+      "2026-10-14"
+    ]
+  },
+  "config_sha256": {
+    "config/training.yaml": "bf65a3e69af9f9646245fa6ae049bd94aef8e862ec810bc85bdb1ff86e2dac6e",
+    "config/features.yaml": "214de85be5d4111c0e8b2fb930b9165030d2f4a3588b23d7d5b1d6df069a0b1f",
+    "config/serving.yaml": "a51e91c44e3da6749a6ff46494d5c9dc4092e4e5f030ef8d57ee0565a97d5784",
+    "config/data.yaml": "267540f9c2195fe12a11216a38133e91350388b25817d043c9258b8ee9c972f4",
+    "config/backtest.yaml": "0e799de1dbdc06a522fd09e3be50e5a9e442c65db7147386b636dd19ccb835b8",
+    "config/monitoring.yaml": "504afe2dd7f073af6834132ee29dd172680a92750f824e579793ff73e6b98e98",
+    "config/universe.txt": "2b452f1a1a88d8d059afb132de2ae0719d37adb2d68a83179f09e1c4d8c5d7a4"
+  },
+  "note": "Ileri test bu imzayla sinirlidir. Model dosyalari, config'ler veya hiperparametreler degisirse bu kayit gecerliligini yitirir (yeniden freeze edilmesi icin acikca karara baglanmalidir)."
+}
