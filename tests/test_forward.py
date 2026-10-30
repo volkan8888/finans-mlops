@@ -254,3 +254,218 @@ def test_dashboard_prepare_forward_helpers():
     assert prepare.forward_quantile_frame({})["quantile"].tolist() == []  # bos
     assert prepare.load_forward() == {} or prepare.load_forward().get("status")
     assert prepare.load_freeze() == {} or prepare.load_freeze().get("model")
+
+
+# ---------------------------------------------------------------------------
+# Yeni olcumler: ust_kantil_eksi_evren / ust_eksi_alt_kantil / unrealized_payi
+# ---------------------------------------------------------------------------
+
+def _manual_realized(with_benchmarks: bool = False) -> pd.DataFrame:
+    """Elle hesapli kucuk ornek: 3 gun x 10 ticker (+Istege bagli benchmark).
+
+    Skor sira: T1 en dusuk (1.0) ... T10 en yuksek (10.0).
+    Getiriler: gun 0 ve 2 -> r(i) = (i-1)/1000 (T10 en iyi); gun 1 -> TERS
+    (r(i) = (10-i)/1000). n_quantiles=5 ile her kanta 2 ticker dusar:
+    q4 = {T9, T10}, q0 = {T1, T2}.
+    Elle degerler (n=5):
+      gun 0/2: ust 0.0085, alt 0.0005, evren 0.0045 -> ust-evren +0.0040, ust-alt +0.0080
+      gun 1  : ust 0.0005, alt 0.0085, evren 0.0045 -> ust-evren -0.0040, ust-alt -0.0080
+    """
+    dates = pd.bdate_range("2025-01-01", periods=3)
+    tickers = [f"T{i}" for i in range(1, 11)]
+    rows: list[dict] = []
+    for day_index, date in enumerate(dates):
+        for i, ticker in enumerate(tickers, start=1):
+            ticker_return = (10 - i) / 1000.0 if day_index == 1 else (i - 1) / 1000.0
+            rows.append({
+                "date": date,
+                "ticker": ticker,
+                "score": float(i),
+                "realized": ticker_return,
+            })
+    if with_benchmarks:
+        for day_index, date in enumerate(dates):
+            rows.append({"date": date, "ticker": "SPY", "score": 99.0, "realized": 0.05})
+            rows.append({"date": date, "ticker": "^GSPC", "score": 98.0, "realized": 0.04})
+    return pd.DataFrame(rows)
+
+
+def test_ust_kantil_spread_elle_ornek_birebir():
+    """Elle hesap: gunluk ust-evren / ust-alt degerleri birebir; seri + ort + NW."""
+    realized = _manual_realized()
+    spreads = forward.daily_spread_series(realized, n_quantiles=5)
+    assert list(spreads["date"].dt.date.astype(str)) == ["2025-01-01", "2025-01-02", "2025-01-03"]
+
+    # gun 0 ham kolonlar
+    first = spreads.iloc[0]
+    assert math.isclose(first["ust"], 0.0085, abs_tol=1e-12)
+    assert math.isclose(first["alt"], 0.0005, abs_tol=1e-12)
+    assert math.isclose(first["evren"], 0.0045, abs_tol=1e-12)
+    # gunluk farklar (gun 1 ters sinyal)
+    assert [round(value, 6) for value in spreads["ust_eksi_evren"]] == [0.004, -0.004, 0.004]
+    assert [round(value, 6) for value in spreads["ust_eksi_alt"]] == [0.008, -0.008, 0.008]
+
+    summary = forward._spread_summary(spreads, "ust_eksi_evren", nw_lag=4)
+    assert summary["n_gun"] == 3
+    assert summary["ortalama"] == 0.001333  # round(0.004/3, 6)
+    assert summary["seri"][0] == {"date": "2025-01-01", "deger": 0.004}
+    assert summary["t_nw"] is None or math.isfinite(float(summary["t_nw"]))
+    summary_alt = forward._spread_summary(spreads, "ust_eksi_alt", nw_lag=4)
+    assert summary_alt["ortalama"] == 0.002667  # round(0.008/3, 6)
+
+
+def test_mukemmel_sinyal_ust_alt_pozitif():
+    """skor = gelecek getiri: ust-alt farki pozitif ve buyuk."""
+    rng = __import__("numpy").random.default_rng(42)
+    rows: list[dict] = []
+    dates = pd.bdate_range("2025-02-03", periods=6)
+    for date in dates:
+        returns = rng.uniform(-0.02, 0.02, 40)
+        for ticker_index in range(40):
+            rows.append({
+                "date": date,
+                "ticker": f"C{ticker_index:03d}",
+                "score": float(returns[ticker_index]),
+                "realized": float(returns[ticker_index]),
+            })
+    realized = pd.DataFrame(rows)
+    spreads = forward.daily_spread_series(realized, n_quantiles=5)
+    mean_spread = float(spreads["ust_eksi_alt"].mean())
+    assert len(spreads) == 6
+    assert mean_spread > 0.01  # mukemmel sinyalde genis pozitif gap
+
+
+def test_ters_sinyal_ust_alt_negatif():
+    """skor = -getiri: ust-alt farki negatif (buyuklugunde buyuk)."""
+    rng = __import__("numpy").random.default_rng(7)
+    rows: list[dict] = []
+    dates = pd.bdate_range("2025-02-03", periods=6)
+    for date in dates:
+        returns = rng.uniform(-0.02, 0.02, 40)
+        for ticker_index in range(40):
+            rows.append({
+                "date": date,
+                "ticker": f"C{ticker_index:03d}",
+                "score": float(-returns[ticker_index]),
+                "realized": float(returns[ticker_index]),
+            })
+    realized = pd.DataFrame(rows)
+    spreads = forward.daily_spread_series(realized, n_quantiles=5)
+    assert float(spreads["ust_eksi_alt"].mean()) < -0.01
+
+
+def test_rastgele_sinyal_ust_alt_sifir_yakini():
+    """Bagimsiz skor/getiri: fark 0'a yakin (genis tolerans, sabit seed)."""
+    rng = __import__("numpy").random.default_rng(1234)
+    rows: list[dict] = []
+    dates = pd.bdate_range("2025-02-03", periods=12)
+    for date in dates:
+        returns = rng.uniform(-0.02, 0.02, 40)
+        scores = rng.uniform(-0.02, 0.02, 40)  # bagimsiz cizim
+        for ticker_index in range(40):
+            rows.append({
+                "date": date,
+                "ticker": f"C{ticker_index:03d}",
+                "score": float(scores[ticker_index]),
+                "realized": float(returns[ticker_index]),
+            })
+    realized = pd.DataFrame(rows)
+    spreads = forward.daily_spread_series(realized, n_quantiles=5)
+    assert abs(float(spreads["ust_eksi_alt"].mean())) < 0.01
+    assert float(spreads["ust_eksi_alt"].abs().max()) < 0.06
+
+
+def test_benchmark_tickerlari_evrende_yok():
+    """SPY / ^GSPC evren ortalamasina girmiyor; haric tutulmazsa deger degisir."""
+    realized = _manual_realized(with_benchmarks=True)
+    spreads_default = forward.daily_spread_series(realized, n_quantiles=5)  # default: SPY/^GSPC haric
+    spreads_none = forward.daily_spread_series(realized, n_quantiles=5, excluded=set())
+    # default: SPY + ^GSPC sira VE evren ortalamasi disinda -> elle deger ayni
+    assert math.isclose(spreads_default.iloc[0]["evren"], 0.0045, abs_tol=1e-9)
+    assert math.isclose(spreads_none.iloc[0]["evren"], 0.01125, abs_tol=1e-9)  # (0.045+0.05+0.04)/12
+    assert spreads_default.iloc[0]["ust_eksi_evren"] != spreads_none.iloc[0]["ust_eksi_evren"]
+
+
+def test_report_hepsi_unrealized_oran_1(tmp_path: pathlib.Path):
+    """Hic gerceklesen yok: cokme yok; oran 1.0; spreads None; status korunur."""
+    prices_path = tmp_path / "prices.parquet"
+    _synthetic_prices(n_days=14).to_parquet(prices_path, index=False)
+    preds_dir = tmp_path / "pred"
+    preds_dir.mkdir()
+    _synthetic_predictions([11, 12, 13]).to_parquet(
+        preds_dir / "predictions_2025-01-01.parquet", index=False
+    )
+    report = forward.forward_test_report(
+        predictions_dir=preds_dir,
+        prices_path=prices_path,
+        horizon=5,
+        output_path=None,
+    )
+    assert report["status"] == "tum_beklemede"
+    assert report["unrealized_payi"] == {"toplam": 12, "gerceklesen": 0, "bekleyen": 12, "oran": 1.0}
+    assert report["ust_kantil_eksi_evren"] is None
+    assert report["ust_eksi_alt_kantil"] is None
+    # mevcut alanlar aynen duruyor
+    assert report["n_unrealized"] == 12 and report["n_realized"] == 0
+    assert report["alerts"]
+
+
+def test_report_karisik_unrealized_orani(tmp_path: pathlib.Path):
+    """Kismi gerceklesen: oran beklenen; spreads yalniz gerceklesen gunlerden."""
+    prices_path = tmp_path / "prices.parquet"
+    _synthetic_prices(n_days=14).to_parquet(prices_path, index=False)
+    preds_dir = tmp_path / "pred"
+    preds_dir.mkdir()
+    _synthetic_predictions([0, 1]).to_parquet(
+        preds_dir / "predictions_2025-01-01.parquet", index=False
+    )
+    _synthetic_predictions([13]).to_parquet(
+        preds_dir / "predictions_2025-01-20.parquet", index=False
+    )
+    report = forward.forward_test_report(
+        predictions_dir=preds_dir,
+        prices_path=prices_path,
+        horizon=3,
+        n_quantiles=4,
+        output_path=None,
+    )
+    assert report["status"] == "ok"
+    # toplam 12 satir (3 gun x 4 ticker); gun 0-1 gerceklesti (8), gun 13 bekler (4)
+    assert report["unrealized_payi"] == {"toplam": 12, "gerceklesen": 8, "bekleyen": 4, "oran": 0.3333}
+    spread = report["ust_kantil_eksi_evren"]
+    assert spread["n_gun"] == 2
+    assert spread["ortalama"] > 0  # AAA>BBB>CCC>DDD deterministik siralama
+    assert report["ust_eksi_alt_kantil"]["ortalama"] > 0
+
+
+def test_report_json_yeni_alanlar_retro_uyumlu(tmp_path: pathlib.Path):
+    """JSON'da yeni alanlar var; mevcut alanlar yine ayni yerlerde."""
+    prices_path = tmp_path / "prices.parquet"
+    _synthetic_prices(n_days=14).to_parquet(prices_path, index=False)
+    preds_dir = tmp_path / "pred"
+    preds_dir.mkdir()
+    _synthetic_predictions([0, 1]).to_parquet(
+        preds_dir / "predictions_2025-01-01.parquet", index=False
+    )
+    output = tmp_path / "forward_report.json"
+    report = forward.forward_test_report(
+        predictions_dir=preds_dir,
+        prices_path=prices_path,
+        horizon=3,
+        n_quantiles=4,
+        output_path=output,
+    )
+    required = {
+        "status", "horizon", "nw_lag", "benchmark", "coverage",
+        "n_realized", "n_unrealized", "quantiles", "overall", "alerts",
+        "ust_kantil_eksi_evren", "ust_eksi_alt_kantil", "unrealized_payi",
+    }
+    assert required <= set(report)
+    assert report["unrealized_payi"]["oran"] == 0.0
+    assert report["unrealized_payi"]["gerceklesen"] == 8
+    from dashboard import prepare
+
+    frame = prepare.forward_quantile_frame(report)
+    assert not frame.empty  # eski dashboard yardimcisi calisir
+    loaded = json.loads(output.read_text(encoding="utf-8"))
+    assert loaded["ust_kantil_eksi_evren"]["n_gun"] == 2

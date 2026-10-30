@@ -176,6 +176,25 @@ def page_forward() -> None:
         forward.get("n_unrealized", 0),
         f"{forward.get('n_realized', 0)} gerceklesti",
     )
+    spread_evs = forward.get("ust_kantil_eksi_evren") or {}
+    spread_ust_alt = forward.get("ust_eksi_alt_kantil") or {}
+    payi = forward.get("unrealized_payi") or {}
+    row_left, row_mid, row_right = st.columns(3)
+    row_left.metric(
+        "Ust kantil - evren (gunluk ort)",
+        fmt_percent(spread_evs.get("ortalama")),
+        f"t_nw={spread_evs.get('t_nw') if spread_evs.get('t_nw') is not None else '-'}",
+    )
+    row_mid.metric(
+        "Ust kantil - alt kantil (gunluk ort)",
+        fmt_percent(spread_ust_alt.get("ortalama")),
+        f"t_nw={spread_ust_alt.get('t_nw') if spread_ust_alt.get('t_nw') is not None else '-'}",
+    )
+    row_right.metric(
+        "Unrealized payi",
+        fmt_percent(payi.get("oran")),
+        f"{payi.get('bekleyen', 0)} / {payi.get('toplam', 0)} tahmin bekliyor",
+    )
     table = forward_quantile_frame(forward)
     if not table.empty:
         st.subheader("Kuantil gerceklesmesi (gunluk ort. getiri)")
