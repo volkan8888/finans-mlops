@@ -1,0 +1,163 @@
+# Adim 12: gunluk ileri test otomasyonu (bilgisayar kapaliyken tahmin uretimi).
+# Dokuman: docs/step12_daily_automation.md
+#
+# Cron saat gerekcesi (DST dahil): ABD borsa kapanisi 16:00 America/New_York
+# = 20:00 UTC (yaz saati) / 21:00 UTC (kis saati). 22:30 UTC her iki durumda
+# da kapanis SONRASIDIR (edt: 2,5 saat / est: 1,5 saat) -> gunun bar'i
+# tamamlanmis olur; kismi oturum olmaz. Cron UTC'de sabit; ET saatisine
+# bakan deger yaz/kis arasinda kayar (diger kisimda anlatilir).
+#
+# Tatil gunlerinde yeni bar yoksa akis cokmez: scripts/check_new_bar.py
+# "none" der -> skorlama ve commit adimlari atlanir, kosu exit 0 ile biter.
+# GitHub zamanlayici gecikebilir ya da bir gun kosuyu komple atlayabilir;
+# atlanan gun GERIYE DONUK URETILMEZ (docs/step12: bosluk, raporun tahmin
+# gunleri listesinde gorunur).
+
+name: daily-forward
+
+on:
+  schedule:
+    - cron: "30 22 * * 1-5" # Pzt-Cum 22:30 UTC (kapanis sonrasi)
+  workflow_dispatch:
+
+concurrency:
+  group: daily-forward
+  cancel-in-progress: false # ayni anda iki kosunun tahmin yazmasin
+
+permissions:
+  contents: write # YALNIZCA bu workflow'da: forward-data dalina push yetkisi
+
+jobs:
+  forward-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Depo kodu (master)
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 + pip cache
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Torch CPU + paket (ci.yml ile ayni sirada)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: forward-data dali var mi?
+        id: branch
+        run: |
+          if git ls-remote --exit-code --heads origin forward-data >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: forward-store kur (branch varsa)
+        if: steps.branch.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: forward-data
+          path: forward-store
+
+      - name: Onceki state geri yukle (tahminler + monitoring referansi)
+        run: |
+          set -euo pipefail
+          if [ ! -d forward-store ]; then
+            echo "HATA: forward-data dali yok. Ilk kurulum: docs/step12_daily_automation.md" >&2
+            echo " (features.parquet + holdout_predictions.parquet'i dale yukledikten sonra yeniden kos)" >&2
+            exit 1
+          fi
+          mkdir -p data/predictions data/processed reports/forward_test
+          shopt -s nullglob
+          set -- forward-store/data/predictions/*.parquet
+          if [ "$#" -gt 0 ]; then
+            # Tahminler no-clobber: Var olan dosya ASLA ezilmez (butunluk).
+            cp -vn "$@" data/predictions/
+          fi
+          # Referans dosyalar (zorunlu) ve raporlar (ilk dale yuklenmemis olabilir):
+          cp -v forward-store/data/processed/features.parquet data/processed/
+          cp -v forward-store/data/processed/holdout_predictions.parquet data/processed/
+          if [ -f forward-store/reports/forward_test/forward_report.json ]; then
+            cp -v forward-store/reports/forward_test/forward_report.json reports/forward_test/
+          fi
+          if [ -f forward-store/reports/monitoring_report.json ]; then
+            cp -v forward-store/reports/monitoring_report.json reports/
+          fi
+          echo "state geri yuklendi"
+
+      - name: "Model indir (GitHub Release: model-v1)"
+        env:
+          GH_TOKEN: ${{ github.token }} # ek secret YOK; GITHUB_TOKEN yeter
+        run: |
+          mkdir -p models/gru
+          gh release download model-v1 --repo "$GITHUB_REPOSITORY" --pattern "model.pt" --dir models/gru --clobber
+
+      - name: Model hash dogrula (freeze.json; uyusmazsa kosu BASARISIZ)
+        run: |
+          python scripts/verify_model_hash.py --model models/gru/model.pt --freeze reports/forward_test/freeze.json
+          echo "Not: MLflow registry CI'da yok; model yerel fallback'ten (models/gru) yuklenir (model_store uyarisini loglar)."
+
+      - name: Veri tazeleme - ingestion (yfinance hata verirse 3 deneme)
+        run: |
+          ok=0
+          for deneme in 1 2 3; do
+            if python -m ingestion.run; then
+              ok=1
+              break
+            fi
+            echo "ingestion deneme $deneme basarisiz; 15 sn sonra tekrar deneniyor"
+            sleep 15
+          done
+          if [ "$ok" != "1" ]; then
+            echo "HATA: ingestion 3 denemede de basarisiz; kosu BASARISIZ isaretleniyor" >&2
+            exit 1
+          fi
+
+      - id: newbar
+        name: Yeni tamamlanmis bar var mi? (tatil => none, temiz cikis)
+        run: python scripts/check_new_bar.py
+
+      - name: Gunluk akis - skor + tahmin + monitoring (yeni bar varsa)
+        if: steps.newbar.outputs.bar == 'new'
+        run: |
+          python scripts/run_daily.py --mode daily
+          python -m monitoring.forward
+
+      - name: forward-data dalina kaydet (tahminler append-only + guncel raporlar)
+        if: steps.newbar.outputs.bar == 'new'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          NEW_DATE=$(ls data/predictions | sed -n 's/^predictions_\([0-9-]*\)\.parquet$/\1/p' | sort | tail -1)
+          echo "tahmin gunu: $NEW_DATE"
+          if [ -d forward-store ]; then
+            mkdir -p forward-store/data/predictions forward-store/data/processed forward-store/reports/forward_test
+            cp -vn data/predictions/*.parquet forward-store/data/predictions/
+            cp -v reports/forward_test/forward_report.json forward-store/reports/forward_test/
+            cp -v reports/monitoring_report.json forward-store/reports/
+            git -C forward-store fetch origin forward-data --quiet
+            git -C forward-store add -f data/predictions reports/forward_test/forward_report.json reports/monitoring_report.json
+            KOMUT=$(git -C forward-store diff --cached --name-status origin/forward-data -- data/predictions || true)
+            if echo "$KOMUT" | grep -E '^(M|D)'; then
+              echo "HATA: eski tahmin dosyasi degisti veya silindi (butunluk ihlali):" >&2
+              echo "$KOMUT" >&2
+              exit 1
+            fi
+            if git -C forward-store diff --cached --quiet origin/forward-data; then
+              echo "degisiklik yok; commit atilmaz"
+            else
+              git -C forward-store commit -m "forward: tahmin $NEW_DATE"
+              git -C forward-store push origin HEAD:refs/heads/forward-data
+            fi
+          else
+            # Branch hic yok ise: orphan dal kur, SADECE state + bugunun tahmini yaz.
+            git checkout --orphan forward-data
+            git rm -r --cached . -q || true
+            git add -f data/predictions reports/forward_test/forward_report.json reports/monitoring_report.json data/processed/features.parquet data/processed/holdout_predictions.parquet
+            git commit -m "forward: tahmin $NEW_DATE"
+            git push origin forward-data
+          fi
