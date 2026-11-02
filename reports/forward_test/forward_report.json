@@ -1,0 +1,27 @@
+{
+  "horizon": 5,
+  "nw_lag": 4,
+  "benchmark": "SPY",
+  "coverage": {
+    "n_prediction_days": 3,
+    "first_date": "2026-10-29",
+    "last_date": "2026-11-02",
+    "n_files_skipped": 0,
+    "skipped_files": []
+  },
+  "n_realized": 0,
+  "n_unrealized": 132,
+  "quantiles": [],
+  "unrealized_payi": {
+    "toplam": 132,
+    "gerceklesen": 0,
+    "bekleyen": 132,
+    "oran": 1.0
+  },
+  "status": "tum_beklemede",
+  "ust_kantil_eksi_evren": null,
+  "ust_eksi_alt_kantil": null,
+  "alerts": [
+    "5-gunluk pencere henuz dolmadi; 132 tahmin bekletiliyor (atlanip sayildi)"
+  ]
+}
