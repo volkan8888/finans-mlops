@@ -3,9 +3,9 @@
 #
 # Cron saat gerekcesi (DST dahil): ABD borsa kapanisi 16:00 America/New_York
 # = 20:00 UTC (yaz saati) / 21:00 UTC (kis saati). 22:30 UTC her iki durumda
-# da kapanis SONRASIDIR (edt: 2,5 saat / est: 1,5 saat) -> gunun bar'i
-# tamamlanmis olur; kismi oturum olmaz. Cron UTC'de sabit; ET saatisine
-# bakan deger yaz/kis arasinda kayar (diger kisimda anlatilir).
+# da kapanis SONRASIDIR (yaz: 2,5 saat / kis: 1,5 saat) -> gunun bar'i
+# tamamlanmis olur; kismi oturum olmaz. Cron UTC'de sabittir; ET'ye gore
+# kapanis saati yaz/kis arasinda kayar (ayrinti docs/step12'de).
 #
 # Tatil gunlerinde yeni bar yoksa akis cokmez: scripts/check_new_bar.py
 # "none" der -> skorlama ve commit adimlari atlanir, kosu exit 0 ile biter.
@@ -22,7 +22,7 @@ on:
 
 concurrency:
   group: daily-forward
-  cancel-in-progress: false # ayni anda iki kosunun tahmin yazmasin
+  cancel-in-progress: false # ayni anda iki kosu tahmin yazmasin
 
 permissions:
   contents: write # YALNIZCA bu workflow'da: forward-data dalina push yetkisi
@@ -150,6 +150,9 @@ jobs:
             if git -C forward-store diff --cached --quiet origin/forward-data; then
               echo "degisiklik yok; commit atilmaz"
             else
+              # forward-store ayri bir git deposu: kimlik burada tanimlanmali
+              git -C forward-store config user.name "github-actions[bot]"
+              git -C forward-store config user.email "41898282+github-actions[bot]@users.noreply.github.com"
               git -C forward-store commit -m "forward: tahmin $NEW_DATE"
               git -C forward-store push origin HEAD:refs/heads/forward-data
             fi
