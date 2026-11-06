@@ -3,25 +3,83 @@
   "nw_lag": 4,
   "benchmark": "SPY",
   "coverage": {
-    "n_prediction_days": 5,
+    "n_prediction_days": 6,
     "first_date": "2026-10-29",
-    "last_date": "2026-11-04",
+    "last_date": "2026-11-05",
     "n_files_skipped": 0,
     "skipped_files": []
   },
-  "n_realized": 0,
+  "n_realized": 44,
   "n_unrealized": 220,
-  "quantiles": [],
+  "quantiles": [
+    {
+      "quantile": "q0",
+      "n_days": 1,
+      "mean_return": -0.07004470389141239,
+      "vs_benchmark": -0.07283290889027172
+    },
+    {
+      "quantile": "q1",
+      "n_days": 1,
+      "mean_return": -0.03154079984530224,
+      "vs_benchmark": -0.03432900484416157
+    },
+    {
+      "quantile": "q2",
+      "n_days": 1,
+      "mean_return": -0.01264694378979709,
+      "vs_benchmark": -0.01543514878865642
+    },
+    {
+      "quantile": "q3",
+      "n_days": 1,
+      "mean_return": 0.0014363419722564557,
+      "vs_benchmark": -0.0013518630266028749
+    },
+    {
+      "quantile": "q4",
+      "n_days": 1,
+      "mean_return": -0.03400007827865138,
+      "vs_benchmark": -0.036788283277510714
+    }
+  ],
   "unrealized_payi": {
-    "toplam": 220,
-    "gerceklesen": 0,
+    "toplam": 264,
+    "gerceklesen": 44,
     "bekleyen": 220,
-    "oran": 1.0
+    "oran": 0.8333
   },
-  "status": "tum_beklemede",
-  "ust_kantil_eksi_evren": null,
-  "ust_eksi_alt_kantil": null,
-  "alerts": [
-    "5-gunluk pencere henuz dolmadi; 220 tahmin bekletiliyor (atlanip sayildi)"
-  ]
+  "ust_kantil_eksi_evren": {
+    "n_gun": 1,
+    "ortalama": -0.005566,
+    "t_nw": null,
+    "seri": [
+      {
+        "date": "2026-10-29",
+        "deger": -0.005566
+      }
+    ]
+  },
+  "ust_eksi_alt_kantil": {
+    "n_gun": 1,
+    "ortalama": 0.036045,
+    "t_nw": null,
+    "seri": [
+      {
+        "date": "2026-10-29",
+        "deger": 0.036045
+      }
+    ]
+  },
+  "status": "ok",
+  "overall": {
+    "mean_ic": 0.0723,
+    "std_ic": 0.0,
+    "icir": null,
+    "t_stat": null,
+    "t_nw": null,
+    "positive_share": 1.0,
+    "n_days": 1.0
+  },
+  "alerts": []
 }
