@@ -6,13 +6,20 @@ Akis:
        (en eski son tarih + 1 gun; hic veri yoksa config start_date)
     3. universe ve benchmarks'i ayri bloklarda indir; IKISI DE depoya yazilir,
        feature/siralama evrenine yalnizca universe girer
-    4. validate_prices ile dogrula (bozuksa HICBIR SEY kaydetmeden dur)
-    5. merge_prices + save_prices (merge idempotent)
-    6. find_anomalies raporunu logla
+    4. son-bar temizligi: en yeni tarihteki NaN close/adj_close satirlari
+       atilir (istisna yalnizca son tarih; ayrinti drop_incomplete_latest_rows)
+    5. validate_prices ile dogrula (gecmis NaN dahil bozuksa HICBIR SEY
+       kaydetmeden dur)
+    6. merge_prices + save_prices (merge idempotent)
+    7. find_anomalies raporunu logla
     Ozet log: stok/benchmark sayisi, yeni satir sayisi, anomali sayisi.
 
 Idempotentlik: ust uste kosulan ikinci gerceklemede yeni satir eklenmez;
 veri birebir ayniysa dosya fiziksel olarak da yeniden yazilmaz.
+
+Cikis kodlari (`python -m ingestion.run`):
+    0 = tamam | 1 = ag/indirme/calisma hatasi (tekrar denenebilir)
+    | 2 = dogrulama/veri/config hatasi (tekrar deneme anlamsiz).
 """
 
 from __future__ import annotations
@@ -27,7 +34,11 @@ import pandas as pd
 if __package__ in (None, ""):  # dogrudan calistirma: python src/ingestion/run.py
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ingestion.config import DEFAULT_CONFIG_PATH, load_config
+from ingestion.config import (
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_MAX_INCOMPLETE_LATEST_SHARE,
+    load_config,
+)
 from ingestion.download import download_in_batches
 from ingestion.storage import (
     empty_prices_frame,
@@ -46,6 +57,81 @@ ANOMALY_LOG_LIMIT = 20
 def _next_day(ts: pd.Timestamp) -> str:
     """Depodaki gunden sonraki gun: yeni pencerenin baslangici."""
     return (pd.Timestamp(ts) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def drop_incomplete_latest_rows(
+    panel: pd.DataFrame,
+    universe: list[str],
+    benchmarks: list[str],
+    max_share: float = DEFAULT_MAX_INCOMPLETE_LATEST_SHARE,
+) -> pd.DataFrame:
+    """En yeni tarihteki (son bar) NaN close/adj_close satirlarini temizler.
+
+    Istisna YALNIZCA son tarih icindir: yfinance bazen son barin
+    close/adj_close'unu gecici olarak NaN verebilir (kapanis verisi gec
+    yayiliyor). Gecmis tarihlerden NaN'li satir degistirilmez; validate_prices
+    onlar icin aynen SERT hata verir (veri uydurulmaz).
+
+    Kurallar:
+    - Hisse (benchmark olmayan) satirinin close/adj_close'u NaN ise o satir
+      atilir + WARNING (ticker listesi ile).
+    - Eksik hisse sayisi evrenin max_share oranini ASARSA o tarih KOMPLE
+      atilir (hisseler cogunlukla NaN ise gun fazla bozuk kabul edilir).
+    - Benchmark satiri NaN ise yalnizca o satir atilir; eksik sayaca
+      katilmaz, tarih komple atma tetiklenmez.
+
+    Panel DataFrame (date,ticker,...) kolonlari; donecek de temiz panel.
+    """
+    if panel is None or panel.empty or "date" not in panel.columns:
+        return panel
+    son_date = panel["date"].max()
+    if pd.isna(son_date):
+        return panel
+
+    son_mask = panel["date"] == son_date
+    nan_mask = son_mask & (panel["close"].isna() | panel["adj_close"].isna())
+    if not nan_mask.any():
+        return panel
+
+    benchmark_set = {str(item).upper() for item in benchmarks}
+    eksik = panel.loc[nan_mask]
+    is_benchmark = eksik["ticker"].isin(benchmark_set)
+    hisse_sen = list(eksik.loc[~is_benchmark, "ticker"])
+    benchmark_sen = list(eksik.loc[is_benchmark, "ticker"])
+    universe_toplam = len(universe)
+    share = len(hisse_sen) / universe_toplam if universe_toplam else 0.0
+    tarih_str = str(pd.Timestamp(son_date).date())
+
+    logger.warning(
+        "Son bar %s: %d satirda close/adj_close NaN | hisse=%d | benchmark=%d",
+        tarih_str,
+        len(eksik),
+        len(hisse_sen),
+        len(benchmark_sen),
+    )
+    if share > max_share:
+        logger.warning(
+            "Son bar %s KOMPLE atiliyor: eksik hisse %d/%d (oran=%.3f > esik=%.3f) "
+            "| benchmark atilan: %s | hisse atilan tam liste: %s",
+            tarih_str,
+            len(hisse_sen),
+            universe_toplam,
+            share,
+            max_share,
+            benchmark_sen,
+            hisse_sen,
+        )
+        return panel.loc[~son_mask].reset_index(drop=True)
+
+    logger.warning(
+        "Son bar %s icin %d NaN satir atildi (hisse=%s | benchmark=%s); "
+        "guncel barin eksik hisseleri sonraki kosularda tazeleme ile kendiliginden duzelir.",
+        tarih_str,
+        len(eksik),
+        hisse_sen,
+        benchmark_sen,
+    )
+    return panel.loc[~nan_mask].reset_index(drop=True)
 
 
 def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
@@ -120,8 +206,15 @@ def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
     else:
         raw = pd.concat(parts, ignore_index=True)
 
+    if not raw.empty:
+        # istisna yalnizca SON tarih: eksik (NaN) son bar satirlari temizlenir;
+        # gecmis tarihler validate_prices'a aynen sorgulamaya girer.
+        raw = drop_incomplete_latest_rows(
+            raw, universe, benchmarks, cfg.max_incomplete_latest_share
+        )
+
     if raw.empty:
-        logger.info("Indirme bos dondu (yeni gun yok / kaynak yok); depo degismedi.")
+        logger.info("Indirme bos dondu (yeni gun yok / kaynak yok / son tarih atildi); depo degismedi.")
         validated = empty_prices_frame()
     else:
         # bozuk veri gelirse ValueError firlar -> kaydetme adimina hic gelinmez
@@ -170,10 +263,28 @@ def run(config_path: str = DEFAULT_CONFIG_PATH, end: str | None = None) -> None:
     )
 
 
-if __name__ == "__main__":
+def main() -> int:
+    """CLI girisi: cikis kodlari eylem ipucu tasir.
+
+    0 = tamam | 1 = ag/indirme/beklenmeyen calisma hatasi (tekrar deneme
+    mantikli) | 2 = dogrulama/veri/config hatasi (ayni hata tekrar uretilir;
+    tekrar deneme anlamsiz).
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
         datefmt="%H:%M:%S",
     )
-    run()
+    try:
+        run()
+    except ValueError as exc:
+        logger.error("Kalici veri/dogrulama hatasi (tekrar deneme anlamsiz): %s", exc)
+        return 2
+    except Exception:
+        logger.exception("Beklenmeyen calisma hatasi (tekrar denenebilir)")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

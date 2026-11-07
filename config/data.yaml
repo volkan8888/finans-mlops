@@ -15,3 +15,6 @@ storage:
 
 ingestion:
   batch_size: 10
+  # Son tarihte NaN close/adj_close istisnasi: eksik hisse evrenin bu
+  # oranindan fazla ise o tarih KOMPLE atilir (0.10 = %10).
+  max_incomplete_latest_share: 0.10

@@ -100,20 +100,29 @@ jobs:
           python scripts/verify_model_hash.py --model models/gru/model.pt --freeze reports/forward_test/freeze.json
           echo "Not: MLflow registry CI'da yok; model yerel fallback'ten (models/gru) yuklenir (model_store uyarisini loglar)."
 
-      - name: Veri tazeleme - ingestion (yfinance hata verirse 3 deneme)
+      - name: "Veri tazeleme - ingestion (ag hatasi: 3 deneme; dogrulama hatasi: tekrar yok)"
         run: |
           ok=0
+          kod=0
           for deneme in 1 2 3; do
-            if python -m ingestion.run; then
+            kod=0
+            python -m ingestion.run || kod=$?
+            if [ "$kod" -eq 0 ]; then
               ok=1
               break
             fi
-            echo "ingestion deneme $deneme basarisiz; 15 sn sonra tekrar deneniyor"
+            if [ "$kod" -eq 2 ]; then
+              echo "HATA: ingestion dogrulama/veri hatasi (kod=2); ayni hata tekrar uretilir, deneme dongusu bitirildi" >&2
+              break
+            fi
+            echo "ingestion deneme $deneme ag/indirme hatasi (kod=$kod); 15 sn sonra tekrar" >&2
             sleep 15
           done
-          if [ "$ok" != "1" ]; then
-            echo "HATA: ingestion 3 denemede de basarisiz; kosu BASARISIZ isaretleniyor" >&2
-            exit 1
+          if [ "$ok" -eq 1 ]; then
+            echo "ingestion tamam"
+          else
+            echo "HATA: ingestion basarili olmadi (son kod=$kod); kosu BASARISIZ" >&2
+            exit "$kod"
           fi
 
       - id: newbar

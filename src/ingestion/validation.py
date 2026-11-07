@@ -22,7 +22,6 @@ DEFAULT_MAX_GAP_BUSINESS_DAYS = 5  # 5 is gununden uzun ticari bosluk supheli
 REPORT_COLUMNS = ["ticker", "date", "reason"]
 LOG_PREVIEW_LIMIT = 20
 
-
 def get_price_schema() -> pa.DataFrameSchema:
     """Kanonik fiyat semasi: kolonlar, tipler, araliklar, benzersizlik.
 
@@ -53,11 +52,33 @@ def get_price_schema() -> pa.DataFrameSchema:
     )
 
 
+def _satir_ayrintisi(df: pd.DataFrame, index_value: object) -> str:
+    """pandera hata satirini orijinal frame'den ticker+tarihe cevirir.
+
+    failure_cases tablosunda yalnizca DEGER (failure_case), kolon ve kontrol
+    bilgisi var; ticker/tarih bulunmaz. Hata bileseni orijinal df'ten
+    index ile cekilir. Index yoksa (sema-duzey kontrol, NaN) metinle
+    isaretlenir; bu durumda ticker/tarih loglanamaz.
+    """
+    if isinstance(index_value, bool) or not isinstance(index_value, (int, np.integer)):
+        return "satir-bagimsiz"
+    pozisyon = int(index_value)
+    try:
+        kayit = df.iloc[pozisyon]
+    except (IndexError, KeyError):
+        return f"satir={pozisyon} bulunamadi"
+    tarih_raw = kayit.get("date")
+    tarih_str = str(pd.Timestamp(tarih_raw).date()) if pd.notna(tarih_raw) else "tarih-yok"
+    ticker_str = str(kayit.get("ticker") or "ticker-yok")
+    return f"satir={pozisyon} ticker={ticker_str} tarih={tarih_str}"
+
+
 def validate_prices(df: pd.DataFrame) -> pd.DataFrame:
     """Semayi uygular; gecerliyse (coerce edilmis) frame dondurur.
 
     Hata varsa nerede bozuk oldugu loglanir ve ValueError firlatilir;
-    bozuk veri asla depoya kaydedilmez.
+    bozuk veri asla depoya kaydedilmez. Logda her hatanin TICKER ve
+    TARIHI orijinal frame'den index ile bulunarak yazilir.
     """
     if df is None or df.empty:
         raise ValueError("Dogrulama icin veri bos.")
@@ -67,13 +88,13 @@ def validate_prices(df: pd.DataFrame) -> pd.DataFrame:
     except pa.errors.SchemaErrors as exc:
         failures = exc.failure_cases
         logger.error("Dogrulama basarisiz: %d hata (toplam %d satir)", len(failures), len(df))
-        for _, row in failures.head(LOG_PREVIEW_LIMIT).iterrows():
+        for _, fc in failures.head(LOG_PREVIEW_LIMIT).iterrows():
             logger.error(
-                "  | %s | kolon=%s | kontrol=%s | deger=%r",
-                row.get("failure_case"),
-                row.get("column"),
-                row.get("check"),
-                row.get("failure_case"),
+                "  %s | kolon=%s | kontrol=%s | deger=%r",
+                _satir_ayrintisi(df, fc.get("index")),
+                fc.get("column"),
+                fc.get("check"),
+                fc.get("failure_case"),
             )
         raise ValueError(
             f"Fiyat verisi semayi gecemedi: {len(failures)} hata. Ayrinti loglarda."
@@ -104,7 +125,7 @@ def find_anomalies(
     data = df.sort_values(["ticker", "date"], kind="mergesort").reset_index(drop=True)
     reports: list[pd.DataFrame] = []
 
-    # 1) |getiri| eşiği: close[t] / close[t-1] - 1 (ayni ticker icinde)
+    # 1) |getiri| esigi: close[t] / close[t-1] - 1 (ayni ticker icinde)
     prev_close = data.groupby("ticker", sort=False)["close"].shift(1)
     ret = data["close"] / prev_close - 1.0
     jump_mask = ret.abs() > max_abs_return

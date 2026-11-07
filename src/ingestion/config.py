@@ -23,6 +23,9 @@ DEFAULT_CONFIG_PATH = "config/data.yaml"
 DEFAULT_START_DATE = "2015-01-01"
 DEFAULT_PRICES_PATH = "data/raw/prices.parquet"
 DEFAULT_BATCH_SIZE = 25
+# Son tarihte eksik (NaN close/adj_close) bar icin esik: evrenin bu oranindan
+# fazla hisse eksikse o tarih KOMPLE atilir (ingestion/run.py temizligi).
+DEFAULT_MAX_INCOMPLETE_LATEST_SHARE = 0.10
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,8 @@ class Config:
     universe:   feature/siralama evrenindeki hisseler (benchmark degil).
     benchmarks: depoya yazilan, feature evrenine girmeyen referans veriler
                 (orn. ^GSPC, SPY).
+    max_incomplete_latest_share: son tarihte NaN bar istisnasi esigi
+                (evren yuzdesi asilinca tarih komple atilir).
     """
 
     universe: list[str]
@@ -39,6 +44,7 @@ class Config:
     start_date: str
     prices_path: Path
     batch_size: int
+    max_incomplete_latest_share: float
 
 
 def _clean_tickers(raw: list[str] | None) -> list[str]:
@@ -129,7 +135,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     try:
         date_type.fromisoformat(start_date)
     except ValueError as exc:
-        raise ValueError(f"Geçersiz start_date: {start_date!r}") from exc
+        raise ValueError(f"Gecersiz start_date: {start_date!r}") from exc
 
     storage = data.get("storage") or {}
     ingestion = data.get("ingestion") or {}
@@ -140,8 +146,16 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
     if batch_size <= 0:
         raise ValueError(f"batch_size pozitif olmali, gelen deger: {batch_size}")
 
+    share_raw = ingestion.get("max_incomplete_latest_share")
+    max_share = float(share_raw) if share_raw is not None else DEFAULT_MAX_INCOMPLETE_LATEST_SHARE
+    if not 0.0 <= max_share <= 1.0:
+        raise ValueError(
+            f"max_incomplete_latest_share [0,1] araliginda olmali, gelen deger: {max_share}"
+        )
+
     logger.info(
-        "Config yukleniyor: %s | universe=%d (%s) | benchmark=%d | start=%s | prices=%s | batch=%d",
+        "Config yukleniyor: %s | universe=%d (%s) | benchmark=%d | start=%s | prices=%s | "
+        "batch=%d | son-bar-esik=%.2f",
         config_path,
         len(universe),
         universe_source,
@@ -149,6 +163,7 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
         start_date,
         prices_path,
         batch_size,
+        max_share,
     )
     return Config(
         universe=universe,
@@ -156,4 +171,5 @@ def load_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Config:
         start_date=start_date,
         prices_path=prices_path,
         batch_size=batch_size,
+        max_incomplete_latest_share=max_share,
     )

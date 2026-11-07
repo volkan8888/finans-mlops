@@ -126,10 +126,49 @@ Dosyalar yoksa:
 | "forward-data dali yok" (state adimi) | ilk kurulum yapilmadi | "Ilk kurulum" adim 2 |
 | "features.parquet / holdout_predictions.parquet yok" | referans dosyalar dala eklenmemis | adim 2 komutlari |
 | "Model hash dogrulama BASARISIZ" | release assette yanlis/eski model.pt | freeze hashli dosyayi tekrar release et |
-| "ingestion 3 denemede basarisiz" | yfinance kapasitesi ya da gecici hata | 15-30 dk sonra rerun |
+| "ingestion 3 denemede basarisiz" (kod=1) | yfinance kapasitesi ya da gecici ag hatasi | 15-30 dk sonra rerun; tekrar yapilir |
+| "ingestion kod=2" (dogrulama/veri hatasi) | kalici veri sorunu; tekrar deneme anlamsiz | logda ticker/tarih satirini inc; cozulmeden rerun yarar etmez |
 | "HATA: eski tahmin dosyasi degisti" | elle mudahale veya bozuk kopya | dosyayi forward-data dalinda eski haliyle onar |
 | push reddedildi | Workflow permission ayari | Settings > Actions > Workflow permissions |
 | hafta sonunda kosu yok | cron Pzt-Cum | tasarim geregi; sorun yok |
+
+## Eksik son bar toleransi (6 Kasim 2026 olayi sonrasi)
+
+Neden: yfinance bazi sembollerde son barin close/adj_close degerini
+gecici olarak NaN verebilir (kapanis verisi gec yayilir). Eski davranis
+bu satirlari validate_prices'ta SERT hata yapar, kosu 3 kez ayni hatayla
+tekrarlanirdi (6 Kas 2026 koysunda yasandi: 2 ticker'in son satiri NaN,
+logda ticker/tarih bos cikiyordu).
+
+Yeni davranis (`src/ingestion/run.py`, dogrulamadan once):
+
+- Yalnizca EN SON tarihte: NaN close/adj_close satirlari atilir ve
+  WARNING loglanir (ticker listesi dahil).
+- Eksik hisse sayisi evrenin %10'unu ASARSA o tarih KOMPLE atilir
+  (`config/data.yaml` -> `ingestion.max_incomplete_latest_share`, 0.10).
+  Veri UYDURULMAZ; akis yoksa bir sonraki tarihe kadar o gunun bar'ini
+  kullanmaz.
+- Benchmark (^GSPC, SPY) satiri NaN ise yalnizca o satir atilir; eksik
+  sayaca katilmaz, komple-atma tetiklenmez.
+- Gecmis tarihlerdeki NaN hala SERT hata (validate_prices degismedi).
+
+Kendinden duzelme (self-healing): atilan satirlar bir sonraki kosuda
+"ayni-gun tazeleme" penceresiyle yeniden cekilir; kaynak duzeldiginde
+depo eksiksiz dolus. Son tarih komple atilirsa depo bir gun geride
+kalir; `check_new_bar` "none" der ve o gun icin tahmin uretilmez, kosu
+TEMIZ biter (bos/uydurma tahmin yok).
+
+Cikis kodlari ve retry iliskisi:
+
+| kod | anlam | daily.yml davranisi |
+|---|---|---|
+| 0 | ingestion tamam | devam |
+| 1 | ag/indirme/beklenmeyen calisma hatasi | 3 deneme (15 sn arayla), sonra BASARISIZ |
+| 2 | dogrulama/veri/config hatasi | dongu aninda bitirilir; BASARISIZ (tekrar yok) |
+
+Dogrulama hata logu artik satir basina TICKER ve TARIH yazar
+(`satir=NN ticker=XX tarih=YYYY-MM-DD | kolon=... | kontrol=...`); daha
+once yalnizca deger/kolon/kontrol yaziyordu, ticker/tarih cikmiyordu.
 
 ## Zamanlayici guvenilirligi (onemli not)
 
