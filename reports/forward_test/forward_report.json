@@ -3,56 +3,56 @@
   "nw_lag": 4,
   "benchmark": "SPY",
   "coverage": {
-    "n_prediction_days": 9,
+    "n_prediction_days": 10,
     "first_date": "2026-10-29",
-    "last_date": "2026-11-10",
+    "last_date": "2026-11-11",
     "n_files_skipped": 0,
     "skipped_files": []
   },
-  "n_realized": 176,
+  "n_realized": 220,
   "n_unrealized": 220,
   "quantiles": [
     {
       "quantile": "q0",
-      "n_days": 4,
-      "mean_return": -0.035504536973899825,
-      "vs_benchmark": -0.038279142140844664
+      "n_days": 5,
+      "mean_return": -0.024011967673521442,
+      "vs_benchmark": -0.026782575668474688
     },
     {
       "quantile": "q1",
-      "n_days": 4,
-      "mean_return": -0.004249087802449141,
-      "vs_benchmark": -0.007023692969393983
+      "n_days": 5,
+      "mean_return": -0.006699503042008489,
+      "vs_benchmark": -0.009470111036961734
     },
     {
       "quantile": "q2",
-      "n_days": 4,
-      "mean_return": 0.0012026736406272887,
-      "vs_benchmark": -0.0015719315263175533
+      "n_days": 5,
+      "mean_return": -0.0011704918887811382,
+      "vs_benchmark": -0.0039410998837343825
     },
     {
       "quantile": "q3",
-      "n_days": 4,
-      "mean_return": 0.014043266274257504,
-      "vs_benchmark": 0.011268661107312661
+      "n_days": 5,
+      "mean_return": 0.011090993561268806,
+      "vs_benchmark": 0.008320385566315562
     },
     {
       "quantile": "q4",
-      "n_days": 4,
-      "mean_return": -0.028141671544774982,
-      "vs_benchmark": -0.030916276711719825
+      "n_days": 5,
+      "mean_return": -0.026059333205501557,
+      "vs_benchmark": -0.028829941200454803
     }
   ],
   "unrealized_payi": {
-    "toplam": 396,
-    "gerceklesen": 176,
+    "toplam": 440,
+    "gerceklesen": 220,
     "bekleyen": 220,
-    "oran": 0.5556
+    "oran": 0.5
   },
   "ust_kantil_eksi_evren": {
-    "n_gun": 4,
-    "ortalama": -0.018179,
-    "t_nw": -6.001,
+    "n_gun": 5,
+    "ortalama": -0.017022,
+    "t_nw": -7.1036,
     "seri": [
       {
         "date": "2026-10-29",
@@ -69,13 +69,17 @@
       {
         "date": "2026-11-03",
         "deger": -0.007443
+      },
+      {
+        "date": "2026-11-04",
+        "deger": -0.012393
       }
     ]
   },
   "ust_eksi_alt_kantil": {
-    "n_gun": 4,
-    "ortalama": 0.007363,
-    "t_nw": 1.2153,
+    "n_gun": 5,
+    "ortalama": -0.002047,
+    "t_nw": -0.2746,
     "seri": [
       {
         "date": "2026-10-29",
@@ -92,18 +96,24 @@
       {
         "date": "2026-11-03",
         "deger": 0.025741
+      },
+      {
+        "date": "2026-11-04",
+        "deger": -0.039688
       }
     ]
   },
   "status": "ok",
   "overall": {
-    "mean_ic": 0.0199,
-    "std_ic": 0.1259,
-    "icir": 0.1579,
-    "t_stat": 0.3157,
-    "t_nw": 0.7827,
-    "positive_share": 0.75,
-    "n_days": 4.0
+    "mean_ic": -0.0245,
+    "std_ic": 0.1474,
+    "icir": -0.1662,
+    "t_stat": -0.3716,
+    "t_nw": -0.8036,
+    "positive_share": 0.6,
+    "n_days": 5.0
   },
-  "alerts": []
+  "alerts": [
+    "gerceklesen mean_ic <= 0"
+  ]
 }
